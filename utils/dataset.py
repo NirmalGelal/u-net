@@ -50,6 +50,34 @@ class BasicDataset(Dataset):
         
         return img_trans
     
+    @classmethod
+    def RGB_2_class_idx(cls, mask_to_be_converted):
+        mapping = {(0  , 255, 255): 0,    #urban_land
+                (255, 255, 0  ): 1,    #agriculture
+                (255, 0  , 255): 2,    #range_land
+                (0  , 255, 0  ): 3,    #forest_land
+                (0  , 0  , 255): 4,    #water
+                (255, 255, 255):5,     #barren_land
+                (0  , 0  , 0  ):6}     #unknown
+        
+        # create numpy array of as mask_img
+        temp = np.array(mask_to_be_converted)
+
+        # set threshold value of 128. If pixel is less than 128 set it to 0 else 1.
+        temp = np.where(temp>=128, 255, 0)
+
+        class_mask=torch.from_numpy(temp)
+        h, w = class_mask.shape[1], class_mask.shape[2]
+
+        # create same sized empty array
+        mask_out = torch.zeros(h, w, dtype=torch.long)
+            
+        for k in mapping:
+            idx = (class_mask == torch.tensor(k,dtype=torch.uint8).unsqueeze(1).unsqueeze(2))
+            validx = (idx.sum(0) == 3)
+            mask_out[validx] = torch.tensor(mapping[k], dtype=torch.long)
+        return mask_out
+
     def __getitem__(self, index):
         img_path = os.path.join(self.image_dir, self.images[index])
         mask_path = os.path.join(self.mask_dir, self.images[index].replace("sat.jpg","mask.png"))
@@ -61,7 +89,7 @@ class BasicDataset(Dataset):
 
         image = self.preprocess(image, self.scale)
         mask = self.preprocess_mask(image, self.scale)
-        # need to call one hot encoding of labels which is yet to implement
+        mask = self.RGB_2_class_idx(mask)
 
         return {
             'image': torch.from_numpy(image).type(torch.FloatTensor),
