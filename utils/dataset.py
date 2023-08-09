@@ -1,21 +1,28 @@
 import os
+import logging
 import torch
+from glob import glob
 from PIL import Image
 from torch.utils.data import Dataset
 import numpy as np
 
 class BasicDataset(Dataset):
-    def __init__(self, image_dir, mask_dir, scale=1):
+    def __init__(self, image_dir, mask_dir, scale=1, mask_suffix=''):
         self.image_dir = image_dir
         self.mask_dir = mask_dir
+        self.mask_suffix = mask_suffix
         self.scale = scale
-        self.images = os.listdir(image_dir)
+
+
+        self.ids = [os.path.splitext(file)[0] for file in os.listdir(image_dir) if not file.startswith('.')]
+        logging.info(f'Creating dataset with {len(self.ids)} examples')
 
     def __len__(self):
-        return len(self.images)
+        return len(self.ids)
     
     @classmethod
     def preprocess(cls, pil_img, scale):
+        # print(pil_img)
         width, height = pil_img.size
         new_width, new_height = int(scale*width), int(scale*height)
 
@@ -44,9 +51,12 @@ class BasicDataset(Dataset):
 
         img_nd = np.array(pil_img)
 
+        if len(img_nd.shape) == 2:
+            img_nd = np.expand_dims(img_nd, axis=2)
+
         # (height, width, channel) to (channel, height, width)
         img_trans = img_nd.transpose((2,0,1))
-        # torch.set_printoptions(edgeitems=10)
+        torch.set_printoptions(edgeitems=10)
         
         return img_trans
     
@@ -79,16 +89,22 @@ class BasicDataset(Dataset):
         return mask_out
 
     def __getitem__(self, index):
-        img_path = os.path.join(self.image_dir, self.images[index])
-        mask_path = os.path.join(self.mask_dir, self.images[index].replace("sat.jpg","mask.png"))
+        idx = self.ids[index]
+        idx = idx[:len(idx) - 4]
+        
+        mask_file = glob(self.mask_dir + r'\\' + idx + '_mask' + '.png')
+        img_file = glob(self.image_dir + r'\\' + idx + '_sat' + '.jpg')
 
-        image = np.array(Image.open(img_path))
-        mask = np.array(Image.open(mask_path))
+        assert len(mask_file) == 1, f'Either no mask or multiple mask found for the ID {idx}: {mask_file}'
+        assert len(img_file) == 1, f'Either no mask or multiple mask found for the ID {idx}: {img_file}'
+
+        image = Image.open(img_file[0])
+        mask = Image.open(mask_file[0])
 
         assert image.size == mask.size, f'image and mask size must be same size'
 
         image = self.preprocess(image, self.scale)
-        mask = self.preprocess_mask(image, self.scale)
+        mask = self.preprocess_mask(mask, self.scale)
         mask = self.RGB_2_class_idx(mask)
 
         return {
@@ -101,4 +117,4 @@ class BasicDataset(Dataset):
 if __name__ == "__main__":
     dataset = BasicDataset(r"data\training_data\images", r"data\training_data\masks")
     print(f'length of dataset => {len(dataset)}')
-    print(dataset.__getitem__(234))
+    print(dataset.__getitem__(178))

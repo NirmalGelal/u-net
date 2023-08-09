@@ -1,36 +1,44 @@
 import logging
 import os
-
 import torch
 import torch.nn as nn
 from torch import optim
+from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
 from utils.dataset import BasicDataset
+from eval import eval_net
 from torch.utils.data import DataLoader, random_split
-import classcount
+from classcount import classcount
+from unet.unet_model import UNet
 
 
-image_dir = r"data\training_data\images"
-mask_dir = r"data\training_data\masks"
+image_dir = r".\data\training_data\images"
+mask_dir = r".\data\training_data\masks"
 
-def train_net(net, device, epochs=5, batch_size=1, lr=0.001, test_size=0.1, img_scale=0.5):
+# dataset = BasicDataset(image_dir, mask_dir, 0.5)
+checkpoint_dir = 'checkpoints/'
+
+def train_net(net, device, epochs=5, batch_size=1, lr=0.001, val_percent=0.1, save_cp=True, img_scale=0.5):
 
     dataset = BasicDataset(image_dir, mask_dir, img_scale)
-    n_test = int(len(dataset) * test_size)
-    n_train = len(dataset) - n_test
-    train, test = random_split(dataset, [n_train, n_test], generator=torch.Generator().manual_seed(42))
+    n_val = int(len(dataset) * val_percent)
+    n_train = len(dataset) - n_val
+    train, val = random_split(dataset, [n_train, n_val], generator=torch.Generator().manual_seed(42))
     train_loader = DataLoader(train, batch_size=batch_size, shuffle=True, num_workers=8, pin_memory=True)
-    test_loader =DataLoader(test, batch_size=batch_size, shuffle=False, num_workers=8, pin_memory=True, drop_last=True)
+    val_loader =DataLoader(val, batch_size=batch_size, shuffle=False, num_workers=8, pin_memory=True, drop_last=True)
+
+    writer = SummaryWriter(comment=f'LR_{lr}_BS_{batch_size}_SCALE_{img_scale}')
 
     logging.info(f'''Starting training:
-                Epochs:         {epochs}
-                Batch size:     {batch_size}
-                Learning rate:  {lr}
-                Training size:  {n_train}
-                Testing size:   {n_test}
-                Device:         {device.type}
-                Images scaling: {img_scale}
+                Epochs:             {epochs}
+                Batch size:         {batch_size}
+                Learning rate:      {lr}
+                Training size:      {n_train}
+                Validation size:    {n_val}
+                Checkpoints:        {save_cp}
+                Device:             {device.type}
+                Images scaling:     {img_scale}
     ''')
 
     optimizer = optim.Adam(net.parameters(), lr=lr, weight_decay=1e-8)
@@ -45,12 +53,15 @@ def train_net(net, device, epochs=5, batch_size=1, lr=0.001, test_size=0.1, img_
     for epoch in range(epochs):
         net.train()
         epoch_loss = 0
+
         with tqdm(total=n_train, desc=f'Epoch {epoch+1}/{epochs}', unit='img') as pbar:
             for batch in train_loader:
                 net.half()
 
                 imgs = batch['image']
                 true_masks = batch['mask']
+
+                net = net.to(device=device)
 
                 imgs = imgs.to(device=device, dtype=torch.float16)
                 true_masks = true_masks.to(device=device, dtype=torch.long)
@@ -62,7 +73,7 @@ def train_net(net, device, epochs=5, batch_size=1, lr=0.001, test_size=0.1, img_
                 loss = criterion(masks_pred, true_masks)
                 epoch_loss += loss.item()
 
-                pbar.set_postfix({'Epoch Loss': epoch_loss/n_train})
+                pbar.set_postfix(**{'Epoch Loss': epoch_loss/n_train})
 
                 net.float()
                 optimizer.zero_grad()
@@ -72,4 +83,33 @@ def train_net(net, device, epochs=5, batch_size=1, lr=0.001, test_size=0.1, img_
 
                 pbar.update(imgs.shape[0])
 
-                # test_score = eval_net(net, test_loader, device)
+
+                val_score = eval_net(net, val_loader, device)
+
+                logging.info('Validation CE Loss: {}'.format(val_score))
+                writer.add_scalar('Loss/test', val_score, epoch+1)
+                writer.add_images('images', imgs, epoch+1)
+
+                if (epoch+1)%5 == 0:
+                    if save_cp:
+                        try:
+                            os.mkdir(checkpoint_dir)
+                            logging.info('Created checkpoint directory')
+                        except OSError:
+                            pass
+                        torch.save(net.state_dict(), checkpoint_dir + f'CP_epoch {epoch+1}.pth')
+                        logging.info(f'Checkpoint {epoch+1} saved !')
+
+
+if __name__ == '__main__':
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    net = UNet(n_channels=3, n_classes=7, bilinear=True)
+    train_net(
+        net=net,
+        epochs=5,
+        batch_size=2,
+        lr=1e-5,
+        device=device,
+        img_scale=0.5,
+        val_percent=0.2
+    )
