@@ -32,6 +32,9 @@ class BasicDataset(Dataset):
 
         img_nd = np.array(pil_img)
 
+        if len(img_nd.shape) == 2:
+            img_nd = np.expand_dims(img_nd, axis=2)
+
         # (height, width, channel) to (channel, height, width)
         img_trans = img_nd.transpose((2,0,1))
         # between 0 and 1
@@ -40,7 +43,6 @@ class BasicDataset(Dataset):
         
         return img_trans
     
-    @classmethod
     def preprocess_mask(cls, pil_img, scale):
         width, height = pil_img.size
         new_width, new_height = int(scale*width), int(scale*height)

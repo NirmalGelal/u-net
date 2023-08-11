@@ -12,6 +12,7 @@ from torch.utils.data import DataLoader, random_split
 from classcount import classcount
 from unet.unet_model import UNet
 
+torch.autograd.set_detect_anomaly(True)
 
 image_dir = r".\data\training_data\images"
 mask_dir = r".\data\training_data\masks"
@@ -56,19 +57,22 @@ def train_net(net, device, epochs=5, batch_size=1, lr=0.001, val_percent=0.1, sa
 
         with tqdm(total=n_train, desc=f'Epoch {epoch+1}/{epochs}', unit='img') as pbar:
             for batch in train_loader:
-                net.half()
+                # net.half()
 
                 imgs = batch['image']
                 true_masks = batch['mask']
 
                 net = net.to(device=device)
 
-                imgs = imgs.to(device=device, dtype=torch.float16)
-                true_masks = true_masks.to(device=device, dtype=torch.long)
+                # , dtype=torch.float16
+                imgs = imgs.to(device=device)
+                # mask_type = torch.float32 if net.n_classes == 1 else torch.long
+                # , dtype=mask_type
+                true_masks = true_masks.to(device=device)
 
                 masks_pred = net(imgs)
 
-                masks_pred = masks_pred.type(torch.float32)
+                # masks_pred = masks_pred.type(torch.float32)
 
                 loss = criterion(masks_pred, true_masks)
                 epoch_loss += loss.item()
