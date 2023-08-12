@@ -14,8 +14,8 @@ from unet.unet_model import UNet
 
 torch.autograd.set_detect_anomaly(True)
 
-image_dir = r".\data\training_data\images"
-mask_dir = r".\data\training_data\masks"
+image_dir = r".\data1\training_data\images"
+mask_dir = r".\data1\training_data\masks"
 
 # dataset = BasicDataset(image_dir, mask_dir, 0.5)
 checkpoint_dir = 'checkpoints/'
@@ -62,24 +62,22 @@ def train_net(net, device, epochs=5, batch_size=1, lr=0.001, val_percent=0.1, sa
                 imgs = batch['image']
                 true_masks = batch['mask']
 
-                net = net.to(device=device)
+                # net = net.to(device=device)
 
-                # , dtype=torch.float16
-                imgs = imgs.to(device=device)
-                # mask_type = torch.float32 if net.n_classes == 1 else torch.long
-                # , dtype=mask_type
-                true_masks = true_masks.to(device=device)
+                imgs = imgs.to(device=device, dtype=torch.float16)
+                mask_type = torch.float32 if net.n_classes == 1 else torch.long
+                true_masks = true_masks.to(device=device, dtype=mask_type)
 
                 masks_pred = net(imgs)
 
-                # masks_pred = masks_pred.type(torch.float32)
+                masks_pred = masks_pred.type(torch.float32)
 
                 loss = criterion(masks_pred, true_masks)
                 epoch_loss += loss.item()
 
                 pbar.set_postfix(**{'Epoch Loss': epoch_loss/n_train})
 
-                net.float()
+                # net.float()
                 optimizer.zero_grad()
                 loss.backward()
                 nn.utils.clip_grad_value_(net.parameters(), 0.1)

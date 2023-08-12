@@ -28,7 +28,7 @@ for dataset_folder in ["training_data", "test_data"]:
     image_filenames = os.listdir(images_path)
     random.shuffle(image_filenames)
 
-    num_samples = len(image_filenames) // 4  # Select 25% of the data
+    num_samples = len(image_filenames) // 3  # Select 33% of the data
 
     selected_image_filenames = image_filenames[:num_samples]
     selected_mask_filenames = [filename.replace("_sat.jpg", "_mask.png") for filename in selected_image_filenames]
