@@ -117,6 +117,7 @@ class BasicDataset(Dataset):
 
 
 if __name__ == "__main__":
-    dataset = BasicDataset(r"data\training_data\images", r"data\training_data\masks")
+    #change the path accordingly
+    dataset = BasicDataset('path/to/the/training/dataset')
     print(f'length of dataset => {len(dataset)}')
     print(dataset.__getitem__(178))

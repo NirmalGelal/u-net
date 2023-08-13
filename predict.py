@@ -123,6 +123,7 @@ def RGB_2_class_idx(mask_to_be_converted):
     temp = np.array(mask_to_be_converted)
     temp = np.where(temp>=128, 255, 0)
     class_mask=torch.from_numpy(temp)
+    
     h, w = mask_to_be_converted.shape[2], mask_to_be_converted.shape[3]
     img_no=mask_to_be_converted.shape[0]
     mask_out = torch.zeros(img_no,h, w, dtype=torch.long)
@@ -181,9 +182,10 @@ if __name__ == "__main__":
     in_files = args.input
     
     img_scale=args.scale
-    dir_mask='data/test_set_full_set/masks_test/'
-    # dir_mask='data/masks_subset/'
-    # dir_img='data/test_set_full_set/img_test/'
+
+    #change the path accordingly
+    dir_mask='path/to/the/test/mask/folder'
+    
     gt_list=[]
     mask_dirs=sorted( filter( os.path.isfile, glob.glob(dir_mask+'*') ) )
 
@@ -228,6 +230,8 @@ if __name__ == "__main__":
 
         if args.viz:
           im = Image.fromarray(seg)
+          if not (os.path.exists(str(args.output[0]))):
+            os.mkdir(str(args.output[0]))
           im.save(str(args.output[0])+'pred_'+name+'.jpeg')
 
 

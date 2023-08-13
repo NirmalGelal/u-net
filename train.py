@@ -14,8 +14,9 @@ from unet.unet_model import UNet
 
 torch.autograd.set_detect_anomaly(True)
 
-image_dir = r".\data1\training_data\images"
-mask_dir = r".\data1\training_data\masks"
+#change the path accordingly
+image_dir = "path/to/the/training/image"
+mask_dir = "path/to/the/training/mask"
 
 # dataset = BasicDataset(image_dir, mask_dir, 0.5)
 checkpoint_dir = 'checkpoints/'
